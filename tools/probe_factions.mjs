@@ -122,9 +122,9 @@ try {
   on('shop:bought', (p) => bought.push(p));
   const bal = wallet.balance(), stockBefore = shop.stock('hardware', 'crowbar');
   assert.equal(shop.buy('hardware', 'crowbar'), false, 'hostile shop refuses');
-  assert.equal(wallet.balance(), bal);
-  assert.equal(shop.stock('hardware', 'crowbar'), stockBefore);
-  assert.equal(bought.length, 0);
+  assert.equal(wallet.balance(), bal, 'hostile refusal charges nothing');
+  assert.equal(shop.stock('hardware', 'crowbar'), stockBefore, 'hostile refusal leaves stock untouched');
+  assert.equal(bought.length, 0, 'hostile refusal emits no shop:bought');
   // other district unaffected; friendly buy charges the discounted price
   assert.equal(shop.items('clothing').find((i) => i.id === 'cap').price, 25, 'midtown shop unaffected by dockers');
   setRep('dockers', 30);
@@ -162,6 +162,8 @@ try {
   }));
   process.exit(0);
 } catch (e) {
-  console.error(JSON.stringify({ pass: false, failed: e.message }));
+  // AssertionError carries actual/expected; surface them so a failure is diagnosable from the JSON alone.
+  const detail = e instanceof assert.AssertionError ? { actual: e.actual, expected: e.expected } : { stack: e.stack };
+  console.error(JSON.stringify({ pass: false, failed: e.message, ...detail }));
   process.exit(1);
 }

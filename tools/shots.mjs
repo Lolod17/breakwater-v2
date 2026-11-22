@@ -1,9 +1,8 @@
 // Screenshots from the running game, real code and real renderer, 1280x720 JPEG.
-// Default (PASS 19): writes every hand-in image in screenshots/ and prints one JSON line per shot
+// Default (PASS 21): writes exactly the four dossier images in screenshots/ and prints one JSON line per shot
 // (file, bytes, calls, triangles):
 //   1-city, 2-chase, 3-street, 4-last-route  via tools/shots_final.mjs (its scenes and checks, --out screenshots)
-//   10a2-collection, 10a2-collection-rear, 10a2-cabin-{spectre,dominator,inferno,venom}  the PASS 10a2
-//   collection line-up and cabin close-ups, staged exactly as tools/probe_cars.mjs stages them
+// Nothing else is ever written to screenshots/: the dossier caps it at 4 files (main.ts caps.screenshots.max).
 // --archive: the older development stage list (01..09) into tools/screenshots-archive/ instead.
 //   node tools/shots.mjs [--archive] [--headed] [--port 8091]
 import { writeFileSync, mkdirSync, statSync } from 'node:fs';
@@ -11,7 +10,6 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { launch, startServer, watchPage } from './cdp.mjs';
-import { VEHICLE_TYPES } from '../game/src/vehicles/vehicleTypes.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
@@ -40,38 +38,6 @@ if (!argv.includes('--archive')) {
   }
   if (r.stderr.trim()) console.error(r.stderr.trim());
   if (r.status !== 0) failed = true;
-  // 10a2: the collection line-up and the cabin close-ups
-  const server = await startServer(port);
-  const page = await launch({ headless: !argv.includes('--headed'), port: 9349 });
-  const watch = watchPage(page, new URL(server.url).host);
-  mkdirSync(join(ROOT, 'screenshots'), { recursive: true });
-  const shot = async (file) => {
-    await new Promise((res) => setTimeout(res, 150));
-    const f = await page.evaluate('(() => { const f = window.__game.frame(); return { calls: f.calls, triangles: f.triangles }; })()');
-    const { data } = await page.send('Page.captureScreenshot', { format: 'jpeg', quality: 82 });
-    writeFileSync(join(ROOT, 'screenshots', file), Buffer.from(data, 'base64'));
-    console.log(JSON.stringify({ file: `screenshots/${file}`, bytes: statSync(join(ROOT, 'screenshots', file)).size, calls: f.calls, triangles: f.triangles, quality: 82 }));
-  };
-  try {
-    await page.goto(`${server.url}?autostart&seed=1337`);
-    await page.waitFor(() => page.evaluate('!!(window.__game && window.__game.ready)'), 60000);
-    await page.evaluate('window.__game.stage("collection")');
-    await shot('10a2-collection.jpg');
-    await page.evaluate('window.__game.stage("collectionRear")');
-    await shot('10a2-collection-rear.jpg');
-    const cars = await page.evaluate('window.__game.vehicles()');
-    for (const id of ['spectre', 'dominator', 'inferno', 'venom']) {
-      const v = cars.find((c) => c.type === id);
-      if (!v) { console.log(JSON.stringify({ missing: id })); failed = true; continue; }
-      const t = VEHICLE_TYPES[id], side = t.width / 2 + 1.5;
-      await page.evaluate(`window.__game.view([${v.position.x - side}, ${1.55 + (id === 'inferno' ? 0.4 : 0)}, ${v.position.z - 0.9}], [${v.position.x}, ${t.height * 0.68}, ${v.position.z + 0.2}], 50)`);
-      await shot(`10a2-cabin-${id}.jpg`);
-    }
-  } finally {
-    if (watch.errors.length) { console.log(JSON.stringify({ consoleErrors: watch.errors.slice(0, 5) })); failed = true; }
-    await page.close();
-    server.stop();
-  }
   process.exit(failed ? 1 : 0);
 }
 

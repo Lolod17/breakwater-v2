@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BREAKWATER</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="hud" hidden>
+    <!-- PASS 7: four groups. objective (top-left), status (top-right), map (bottom-left), vehicle (bottom-right) -->
+    <section id="hud-objective" class="hud-group" aria-label="Mission objective">
+      <div id="mission" hidden>
+        <div id="objective-kicker">NEW OBJECTIVE</div>
+        <div id="mission-title"></div>
+        <div id="mission-objective"></div>
+        <div id="mission-extra" hidden><span id="mission-meter-label"></span><span class="meter"><span id="mission-meter"></span></span><span id="mission-timer"></span></div>
+      </div>
+    </section>
+
+    <section id="hud-status" class="hud-group" aria-label="Status">
+      <div id="clock-row"><span id="day">DAY 1</span><span id="clock">19:20</span><span id="weather">CLEAR</span></div>
+      <div id="wanted" aria-label="Wanted level 0 of 5"><i></i><i></i><i></i><i></i><i></i></div>
+      <div id="police-status" hidden></div>
+      <div id="vitals">
+        <div id="health-bar"><span id="health-fill"></span><span id="health">100</span></div>
+        <span id="money">$250</span>
+      </div>
+    </section>
+
+    <section id="hud-map" class="hud-group" aria-label="Minimap">
+      <canvas id="minimap" width="200" height="200" aria-label="Minimap"></canvas>
+      <div id="banner"><div id="city">BREAKWATER</div><div id="district">Downtown</div></div>
+    </section>
+
+    <section id="hud-vehicle" class="hud-group" aria-label="Vehicle and weapon">
+      <div id="radio" hidden>
+        <div id="radio-station"><b id="radio-name">BREAKWATER FM</b><span id="radio-freq">98.1</span></div>
+        <div id="radio-track"></div>
+      </div>
+      <div id="speedo" hidden>
+        <div id="car-name">Veloce GT</div>
+        <div class="row"><span id="spd">0</span><span class="unit">km/h</span><span id="gear">1</span></div>
+        <div class="rpm"><div id="rpm-bar"></div></div>
+      </div>
+      <div id="ammo" hidden><span class="w">PISTOL</span><b id="ammo-mag">10</b><span id="ammo-reserve">/ 30</span></div>
+    </section>
+
+    <canvas id="speedlines" aria-hidden="true"></canvas>
+    <div id="radio-panel" hidden aria-label="Radio stations"><div class="rp-head">RADIO <span><kbd>,</kbd> <kbd>R</kbd> tune</span></div><ol></ol></div>
+    <div id="toasts" role="status" aria-live="polite"></div>
+    <div id="perf" hidden></div>
+    <div id="reticle" hidden aria-hidden="true"></div>
+    <div id="lowhp-vignette" aria-hidden="true"></div>
+    <div id="damage-vignette" aria-hidden="true"></div>
+    <div id="story-line" hidden role="status"></div>
+    <div id="briefing" hidden>
+      <div class="panel">
+        <div class="kicker" id="briefing-n"></div>
+        <h2 id="briefing-title"></h2>
+        <div id="briefing-lines"></div>
+        <div class="foot"><span id="briefing-reward"></span><span><kbd>E</kbd> start · walk away to decline</span></div>
+      </div>
+    </div>
+    <div id="result" hidden>
+      <div class="panel"><strong id="result-title"></strong><p id="result-detail"></p><p id="result-hint"></p></div>
+    </div>
+    <div id="choice" hidden>
+      <div class="panel">
+        <p id="choice-prompt"></p>
+        <div class="options"><button id="choice-press"><kbd>1</kbd><span></span></button><button id="choice-deal"><kbd>2</kbd><span></span></button></div>
+      </div>
+    </div>
+    <div id="incident" hidden role="status"><div><strong id="incident-title"></strong><p id="incident-detail"></p></div></div>
+    <div id="keys"></div>
+    <div id="prompt" hidden><kbd>F</kbd><span id="prompt-text">Enter</span></div>
+    <div id="side-prompt" hidden><kbd>E</kbd><span id="side-prompt-text"></span></div>
+    <div id="msg" hidden></div>
+  </div>
+
+  <!-- PASS 15b photo mode: free camera panel (the game HUD is hidden while it is open) -->
+  <div id="photo" hidden aria-label="Photo mode">
+    <div class="p-head"><b>PHOTO MODE</b><span>SIMULATION PAUSED</span></div>
+    <label class="p-row"><span>FIELD OF VIEW</span><input id="photo-fov" type="range" min="15" max="100" step="1" value="60"><output id="photo-fov-v">60°</output></label>
+    <label class="p-row"><span>DEPTH OF FIELD</span><input id="photo-dof" type="range" min="0" max="100" step="1" value="35"><output id="photo-dof-v">35%</output></label>
+    <label class="p-row"><span>FOCUS</span><input id="photo-focus" type="range" min="0" max="200" step="1" value="0"><output id="photo-focus-v">AUTO</output></label>
+    <div id="photo-filters" class="p-filters"><button data-filter="0"><kbd>1</kbd>NEUTRAL</button><button data-filter="1"><kbd>2</kbd>NOIR</button><button data-filter="2"><kbd>3</kbd>WARM FILM</button><button data-filter="3"><kbd>4</kbd>NEON</button></div>
+    <div class="p-keys"><b>WASD</b> fly <b>SPACE Q</b> up / down <b>MOUSE ←→↑↓</b> look <b>Z C</b> roll <b>WHEEL - =</b> FOV <b>[ ]</b> blur <b>, .</b> focus <b>H</b> hide panel <b>ENTER</b> save PNG <b>P</b> exit</div>
+    <div id="photo-note" class="p-note"></div>
+  </div>
+  <div id="photo-flash" aria-hidden="true"></div>
+  <div id="transition" aria-hidden="true"></div>
+
+  <!-- PASS 7 title screen: the live city renders behind it -->
+  <div id="start" hidden>
+    <div class="t-shade" aria-hidden="true"></div>
+    <div class="t-col">
+      <h1 class="t-logo">BREAKWATER</h1>
+      <div class="t-sub"><span class="t-rule"></span><span>THE LAST ROUTE</span><span class="t-rule"></span></div>
+      <p class="t-lore">Night-shift courier. A missing ledger. Five jobs from Marlow.<br>Halden Maritime is hiding a pier — and they think you have the proof.</p>
+      <nav class="t-menu" aria-label="Main menu">
+        <button id="continue" class="t-row" hidden><span class="t-label">CONTINUE</span><span class="t-detail" id="continue-detail">DAY 1 — $250</span><span class="t-go" aria-hidden="true">›</span></button>
+        <button id="play" class="t-row"><span class="t-label">START NEW STORY</span><span class="t-detail" id="play-detail">Mission 1 of 5</span><span class="t-go" aria-hidden="true">›</span></button>
+      </nav>
+      <p id="save-info" class="t-note" hidden></p>
+    </div>
+    <div class="t-controls">
+      <div class="t-head">CONTROLS</div>
+      <div class="t-keys">
+        <kbd>WASD</kbd><span>Move · drive</span>
+        <kbd>SHIFT</kbd><span>Sprint</span>
+        <kbd>MOUSE</kbd><span>Look · right button aims, left fires</span>
+        <kbd>ESC</kbd><span>Release the mouse</span>
+        <kbd>F3</kbd><span>Performance readout</span>
+      </div>
+    </div>
+    <div class="t-footer"><span id="build-version">BUILD 2.7.0</span><span class="t-dot">·</span><span>SEED <span id="title-seed">1337</span></span><span class="t-dot">·</span><span id="title-clock">DAY 1 · 19:20</span><span class="t-nav"><kbd>↑</kbd><kbd>↓</kbd> choose <kbd>ENTER</kbd> select</span></div>
+  </div>
+
+  <div id="loading">
+    <div class="t-col">
+      <h1 class="t-logo">BREAKWATER</h1>
+      <div class="t-sub"><span class="t-rule"></span><span>THE LAST ROUTE</span><span class="t-rule"></span></div>
+      <div class="bar"><div id="load-bar"></div></div>
+      <p id="load-step">Loading</p>
+    </div>
+  </div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
